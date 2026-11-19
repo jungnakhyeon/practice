@@ -1,139 +1,636 @@
-"""12주차 배포 예제 앱: 11주차 대시보드를 웹에 올릴 수 있게 정리한 판.
 
-GitHub 저장소에 이 파일, requirements.txt, sales.csv를 같은 폴더로 올리고
-Community Cloud의 Main file path에 app.py(하위 폴더에 두었다면 그 경로)를 적습니다.
-개인 프로젝트에서는 sales.csv 대신 출처가 분명한 공개 데이터를 씁니다(수업 예제 데이터 제외).
-내 컴퓨터에서 실행: python -m streamlit run app.py
+"""지점 실적 대시보드 | Streamlit 디자인 리뉴얼 버전.
+
+app.py, requirements.txt, sales.csv를 같은 폴더에 배치하세요.
+실행: python -m streamlit run app.py
 """
-# Path: app.py가 있는 폴더를 찾을 때 씁니다. 배포에서 가장 중요한 줄의 재료입니다.
 from pathlib import Path
-
-# font_manager: 서버에 한글 글꼴이 있는지 찾을 때 씁니다.
 import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
-# streamlit: 앱 화면을 만듭니다. 서버에서도 내 컴퓨터와 똑같이 app.py를 위에서 아래로 실행합니다.
 import streamlit as st
 
-# app.py가 있는 폴더. 배포 서버의 작업 폴더(저장소 맨 위)와 다를 수 있어 파일은 이 폴더 기준으로 찾습니다.
-# __file__은 app.py의 경로, .parent는 그 폴더입니다. 서버에서는 저장소 안 app.py의 폴더가 됩니다.
 HERE = Path(__file__).parent
-COLORS = {"A": "#0072B2", "B": "#D55E00"}
+COLORS = {"A": "#13B8A6", "B": "#6D7DF6"}
+NAVY = "#16243B"
+MUTED = "#66758C"
 
-# 브라우저 탭 이름과 넓은 화면을 정합니다.
-st.set_page_config(page_title="지점 실적 탐색", layout="wide")
+st.set_page_config(
+    page_title="Branch Pulse | 지점 실적 대시보드",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# CSS는 화면 디자인만 바꿉니다. 데이터 분석 로직과는 관계없습니다.
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"], [data-testid="stApp"] {
+        font-family: 'Inter', 'Noto Sans KR', sans-serif;
+    }
+    [data-testid="stAppViewContainer"] {
+        background: linear-gradient(180deg, #F1F5FB 0%, #F9FBFD 58%, #F1F5FB 100%);
+    }
+    .block-container {
+        max-width: 1400px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    section[data-testid="stSidebar"] {
+        background: #14233B;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #EAF2FF;
+    }
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {
+        font-weight: 600;
+    }
+    section[data-testid="stSidebar"] [data-baseweb="select"] *,
+    section[data-testid="stSidebar"] [data-baseweb="slider"] *,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: inherit;
+    }
+    .hero {
+        background: linear-gradient(115deg, #16243B 0%, #233E63 65%, #177D81 120%);
+        padding: 30px 34px;
+        border-radius: 20px;
+        color: white;
+        margin-bottom: 22px;
+        box-shadow: 0 10px 28px rgba(19, 39, 69, .12);
+    }
+    .hero-kicker {
+        color: #8FE7DD;
+        font-size: 12px;
+        letter-spacing: 2px;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+    .hero-title {
+        font-size: clamp(25px, 3vw, 37px);
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin: 0 0 9px 0;
+    }
+    .hero-sub {
+        color: #D2DFEC;
+        font-size: 14px;
+        line-height: 1.7;
+        margin: 0;
+    }
+    .section-title {
+        color: #16243B;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -.5px;
+        margin: 16px 0 10px;
+    }
+    .section-desc {
+        color: #66758C;
+        font-size: 13px;
+        margin: 0 0 16px;
+    }
+    [data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E5ECF5;
+        border-radius: 17px;
+        padding: 18px 20px;
+        box-shadow: 0 4px 14px rgba(29, 52, 91, .045);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #66758C;
+    }
+    [data-testid="stMetricValue"] {
+        color: #16243B;
+        font-weight: 800;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] > div {
+        border-radius: 18px;
+    }
+    .insight {
+        background: #EAF8F5;
+        border-left: 4px solid #13B8A6;
+        border-radius: 10px;
+        padding: 15px 18px;
+        color: #1F4E50;
+        margin: 10px 0 22px;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+    .footnote {
+        color: #748196;
+        font-size: 12px;
+        margin-top: 18px;
+    }
+    @media (max-width: 680px) {
+        .block-container {
+            padding-top: 1rem;
+        }
+        .hero {
+            padding: 24px 20px;
+            border-radius: 16px;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-# 결과를 기억해 두어 위젯을 바꿔도 CSV를 다시 읽지 않습니다.
 @st.cache_data
-# HERE / "sales.csv": app.py 옆의 파일. C:/Users/… 같은 내 컴퓨터 경로를 쓰면 서버에서 못 찾습니다(1-3).
 def load_data():
+    # 절대경로 대신 app.py 옆의 sales.csv를 찾습니다.
     return pd.read_csv(HERE / "sales.csv")
 
 
-# Matplotlib은 서버가 그림을 만들어, 서버에 한글 글꼴이 없으면 글자가 □로 나옵니다.
-# 그래서 쓸 수 있는 한글 글꼴을 먼저 찾고, 없으면 None을 돌려줍니다.
 def korean_font():
-    """Matplotlib가 쓸 수 있는 한글 글꼴 이름. 없으면 None(배포 서버에는 없을 수 있습니다)."""
     names = {f.name for f in fm.fontManager.ttflist}
-    return next((f for f in ["Pretendard", "Malgun Gothic", "AppleGothic", "NanumGothic"] if f in names), None)
+    return next(
+        (
+            name for name in [
+                "Pretendard",
+                "Malgun Gothic",
+                "AppleGothic",
+                "NanumGothic"
+            ]
+            if name in names
+        ),
+        None,
+    )
 
 
-# 첫 화면에 질문을 제목으로 둡니다(프로젝트 평가: 질문·데이터).
-st.title("어느 지점의 실적이 더 좋은가")
-# 출처, 기간, 단위를 밝힙니다.
-st.caption("출처: 수업용 가상 데이터(sales.csv) · 2026년 1~12월 지점별 월 실적 · 금액 단위: 백만원")
+# ── 상단 소개 ──
 
-# 저장소에 sales.csv를 올리지 않았거나 이름이 다르면 오류 대신 안내를 보이고 멈춥니다.
+st.markdown(
+    """
+    <div class="hero">
+        <div class="hero-kicker">
+            BRANCH PULSE · PERFORMANCE OVERVIEW
+        </div>
+        <div class="hero-title">
+            지점 실적 인사이트 대시보드
+        </div>
+        <p class="hero-sub">
+            지점별 매출과 영업이익을 한눈에 비교하고,
+            기간에 따른 변화와 수익성을 탐색해 보세요.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 try:
     data = load_data()
 except FileNotFoundError:
-    st.error("app.py와 같은 폴더에 sales.csv를 올려 주세요.")
+    st.error(
+        "sales.csv 파일을 찾을 수 없습니다. "
+        "app.py와 같은 폴더에 넣어 주세요."
+    )
     st.stop()
 
-# 여기부터 11주차와 같은 위젯 세 개입니다.
-st.sidebar.header("조회 조건")
-# 여러 개 고르기: 고른 지점의 리스트
-branches = st.sidebar.multiselect("지점", ["A", "B"], default=["A", "B"])
-# 범위 슬라이더: (시작 월, 끝 월)
-months = st.sidebar.slider("월 범위", 1, 12, (1, 12))
-# 하나 고르기: 고른 지표 이름
-metric_label = st.sidebar.selectbox("표시 지표", ["매출", "영업이익"])
-# 화면 이름(매출)을 표의 열 이름(sales)으로 바꿉니다.
-metric = {"매출": "sales", "영업이익": "profit"}[metric_label]
+required = {"branch", "month", "sales", "profit"}
 
-# 위젯 선택 → view → 숫자·차트·표·CSV가 모두 같은 view를 씁니다.
-# 고른 지점(isin)과 월 범위(between)의 행만 남긴 표입니다.
-view = data.loc[data["branch"].isin(branches) & data["month"].between(months[0], months[1])].copy()
-# 지점을 모두 지우면 view가 빕니다. 안내 뒤 멈추지 않으면 아래 계산에서 오류가 납니다.
+if not required.issubset(data.columns):
+    st.error(
+        f"CSV에 필요한 열이 없습니다: "
+        f"{', '.join(sorted(required - set(data.columns)))}"
+    )
+    st.stop()
+
+
+# ── 왼쪽 필터 ──
+
+st.sidebar.markdown("## ◈ BRANCH PULSE")
+st.sidebar.caption("PERFORMANCE CONTROL PANEL")
+st.sidebar.divider()
+
+st.sidebar.markdown("### 조회 조건")
+
+branches = st.sidebar.multiselect(
+    "지점 선택",
+    ["A", "B"],
+    default=["A", "B"]
+)
+
+months = st.sidebar.slider(
+    "조회 월",
+    1,
+    12,
+    (1, 12)
+)
+
+metric_label = st.sidebar.selectbox(
+    "분석 지표",
+    ["매출", "영업이익"]
+)
+
+metric = {
+    "매출": "sales",
+    "영업이익": "profit"
+}[metric_label]
+
+st.sidebar.divider()
+st.sidebar.caption("DATA  |  2026년 1~12월")
+st.sidebar.caption("SOURCE  |  수업용 가상 데이터")
+st.sidebar.caption("UNIT  |  백만원")
+
+
+# ── 데이터 필터링 ──
+
+view = data.loc[
+    data["branch"].isin(branches)
+    & data["month"].between(months[0], months[1])
+].copy()
+
 if view.empty:
-    st.warning("표시할 데이터가 없습니다. 지점을 하나 이상 선택하세요.")
+    st.warning(
+        "현재 조건에 맞는 데이터가 없습니다. "
+        "왼쪽에서 지점을 하나 이상 선택해 주세요."
+    )
     st.stop()
 
-st.subheader(f"{months[0]}~{months[1]}월 {metric_label} · {', '.join(branches)}지점")
-# 카드 세 개를 나란히 놓습니다.
-c1, c2, c3 = st.columns(3)
-c1.metric(f"기간 {metric_label} 합계", f"{view[metric].sum():,.0f} 백만원")
-c2.metric("표시 관측 수", f"{len(view)} 행")
-# 기간 영업이익률 = 기간 이익 합계 ÷ 기간 매출 합계 × 100. 달마다의 비율을 평균 내지 않습니다.
-c3.metric("기간 영업이익률", f"{view['profit'].sum() / view['sales'].sum() * 100:.1f} %")
-st.caption("한 행은 한 달·한 지점입니다. 영업이익률은 기간 이익 합계 ÷ 기간 매출 합계입니다.")
 
-# 차트 1: 월별 추이. Plotly는 보는 사람의 브라우저가 글자를 그려 한글이 그대로 보입니다.
-# 차트 1(Plotly): 보는 사람의 브라우저가 글자를 그려 서버에 글꼴이 없어도 한글이 보입니다.
-trend = px.line(view.sort_values(["branch", "month"]), x="month", y=metric, color="branch",
-                markers=True, color_discrete_map=COLORS, title="월별 추이",
-                labels={"month": "월", metric: f"{metric_label} (백만원)", "branch": "지점"})
-trend.update_xaxes(dtick=1)
-trend.update_yaxes(rangemode="tozero")
+# ── 핵심 지표 계산 ──
 
-# 차트 2: 기간 합계. Matplotlib는 서버가 그림을 만들어 서버에 한글 글꼴이 있어야 합니다.
-# 차트 2(Matplotlib): 서버에 한글 글꼴이 있는지 먼저 봅니다.
+selected_total = view[metric].sum()
+sales_total = view["sales"].sum()
+profit_total = view["profit"].sum()
+
+margin = (
+    profit_total / sales_total * 100
+    if sales_total != 0
+    else 0.0
+)
+
+branch_totals = view.groupby(
+    "branch",
+    as_index=False
+)[metric].sum()
+
+best_branch = branch_totals.loc[
+    branch_totals[metric].idxmax(),
+    "branch"
+]
+
+
+# ── 핵심 지표 화면 ──
+
+st.markdown(
+    '<div class="section-title">핵심 지표</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    f'<p class="section-desc">'
+    f'2026년 {months[0]}~{months[1]}월 · '
+    f'{", ".join(branches)}지점 · '
+    f'{metric_label} 기준'
+    f'</p>',
+    unsafe_allow_html=True
+)
+
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric(
+    f"기간 {metric_label} 합계",
+    f"{selected_total:,.0f} 백만원"
+)
+
+c2.metric(
+    "기간 영업이익률",
+    f"{margin:.1f}%"
+)
+
+c3.metric(
+    "분석 데이터",
+    f"{len(view):,}건"
+)
+
+c4.metric(
+    f"{metric_label} 1위 지점",
+    f"{best_branch} 지점"
+)
+
+
+# ── 자동 요약 문구 ──
+
+st.markdown(
+    f'<div class="insight">'
+    f'<b>데이터 한눈에 보기</b> · '
+    f'선택 기간의 {metric_label} 합계는 '
+    f'<b>{selected_total:,.0f}백만원</b>이며, '
+    f'{metric_label} 기준으로 '
+    f'<b>{best_branch}지점</b>이 가장 높습니다. '
+    f'기간 전체 영업이익률은 '
+    f'<b>{margin:.1f}%</b>입니다.'
+    f'</div>',
+    unsafe_allow_html=True
+)
+
+
+# ── 차트 공통 디자인 ──
+
+plot_bg = "#FFFFFF"
+grid_color = "#EDF1F6"
+
+
+# ── 차트 1: 월별 추이 ──
+
+trend = px.line(
+    view.sort_values(["branch", "month"]),
+    x="month",
+    y=metric,
+    color="branch",
+    markers=True,
+    color_discrete_map=COLORS,
+    labels={
+        "month": "월",
+        metric: f"{metric_label} (백만원)",
+        "branch": "지점"
+    },
+)
+
+trend.update_traces(
+    line_width=3,
+    marker_size=8
+)
+
+trend.update_layout(
+    height=360,
+    paper_bgcolor=plot_bg,
+    plot_bgcolor=plot_bg,
+    margin=dict(l=15, r=15, t=20, b=20),
+    font=dict(
+        family="Arial, sans-serif",
+        color=NAVY
+    ),
+    hovermode="x unified",
+    legend=dict(
+        orientation="h",
+        y=1.12,
+        x=0
+    ),
+)
+
+trend.update_xaxes(
+    dtick=1,
+    showgrid=False,
+    zeroline=False
+)
+
+trend.update_yaxes(
+    rangemode="tozero",
+    gridcolor=grid_color,
+    zeroline=False
+)
+
+st.markdown(
+    '<div class="section-title">월별 실적 흐름</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<p class="section-desc">'
+    '선 위에 마우스를 올리면 월별 값을 확인할 수 있습니다.'
+    '</p>',
+    unsafe_allow_html=True
+)
+
+with st.container(border=True):
+    st.plotly_chart(
+        trend,
+        width="stretch"
+    )
+
+
+# ── 차트 2: 지점별 합계 ──
+
+totals = view.groupby(
+    "branch",
+    as_index=False
+)[metric].sum()
+
 kfont = korean_font()
-# 지점별 기간 합계 표
-totals = view.groupby("branch", as_index=False)[metric].sum()
-# 한글 글꼴이 있으면 그 글꼴로, 없으면 기본 글꼴(DejaVu Sans)로 그립니다.
-with plt.rc_context({"font.family": kfont or "DejaVu Sans", "axes.unicode_minus": False}):
-    static_fig, ax = plt.subplots(figsize=(6, 3.6))
-    bars = ax.bar(totals["branch"], totals[metric], color=[COLORS[b] for b in totals["branch"]])
-    ax.bar_label(bars, fmt="%.0f", padding=3)
-    # 한글 글꼴이 있을 때만 한글 제목을 씁니다.
+
+with plt.rc_context({
+    "font.family": kfont or "DejaVu Sans",
+    "axes.unicode_minus": False
+}):
+    static_fig, ax = plt.subplots(
+        figsize=(6, 4)
+    )
+
+    static_fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")
+
+    bars = ax.bar(
+        totals["branch"],
+        totals[metric],
+        width=0.55,
+        color=[
+            COLORS[b]
+            for b in totals["branch"]
+        ],
+    )
+
+    ax.bar_label(
+        bars,
+        fmt="%.0f",
+        padding=5,
+        fontsize=11,
+        fontweight="bold",
+        color=NAVY
+    )
+
     if kfont:
-        ax.set(title="기간 합계", xlabel="지점", ylabel=f"{metric_label} (백만원)")
-    else:   # 한글 글꼴이 없는 서버: 글자가 □로 깨지지 않게 영어로 씁니다
-        ax.set(title="Period total", xlabel="Branch", ylabel=f"{metric} (million KRW)")
-    ax.set_ylim(0, max(totals[metric].max() * 1.2, 1))
-    ax.spines[["top", "right"]].set_visible(False)
+        ax.set(
+            xlabel="지점",
+            ylabel=f"{metric_label} (백만원)"
+        )
+    else:
+        ax.set(
+            xlabel="Branch",
+            ylabel=f"{metric} (million KRW)"
+        )
+
+    ax.set_ylim(
+        0,
+        max(totals[metric].max() * 1.25, 1)
+    )
+
+    ax.grid(
+        axis="y",
+        alpha=0.18
+    )
+
+    ax.set_axisbelow(True)
+
+    ax.spines[
+        ["top", "right", "left"]
+    ].set_visible(False)
+
     static_fig.tight_layout()
 
-# 차트 3: 기간 영업이익률(Plotly)
-# 차트 3(Plotly): 지점별 매출과 이익의 기간 합계로 이익률을 계산합니다.
-period = view.groupby("branch", as_index=False)[["sales", "profit"]].sum()
-period["margin"] = period["profit"] / period["sales"] * 100
-margin_fig = px.bar(period, x="branch", y="margin", color="branch", color_discrete_map=COLORS,
-                    title="기간 영업이익률", labels={"branch": "지점", "margin": "영업이익률 (%)"})
-margin_fig.update_layout(showlegend=False)
-margin_fig.update_yaxes(rangemode="tozero")
 
-# 차트 세 개를 세 칸에 나란히 놓습니다(프로젝트 최소 요건: 차트 3개 이상).
-left, middle, right = st.columns(3)
+# ── 차트 3: 지점별 영업이익률 ──
+
+period = view.groupby(
+    "branch",
+    as_index=False
+)[["sales", "profit"]].sum()
+
+period["margin"] = (
+    period["profit"]
+    / period["sales"].replace(
+        0,
+        float("nan")
+    )
+    * 100
+).fillna(0)
+
+margin_fig = px.bar(
+    period,
+    x="branch",
+    y="margin",
+    color="branch",
+    color_discrete_map=COLORS,
+    text=period["margin"].map(
+        lambda value: f"{value:.1f}%"
+    ),
+    labels={
+        "branch": "지점",
+        "margin": "영업이익률 (%)"
+    },
+)
+
+margin_fig.update_traces(
+    textposition="outside",
+    marker_line_width=0
+)
+
+margin_fig.update_layout(
+    height=330,
+    paper_bgcolor=plot_bg,
+    plot_bgcolor=plot_bg,
+    margin=dict(
+        l=15,
+        r=15,
+        t=25,
+        b=20
+    ),
+    showlegend=False,
+    font=dict(
+        family="Arial, sans-serif",
+        color=NAVY
+    ),
+)
+
+margin_fig.update_xaxes(
+    showgrid=False
+)
+
+margin_fig.update_yaxes(
+    rangemode="tozero",
+    gridcolor=grid_color,
+    zeroline=False
+)
+
+
+# ── 두 차트를 나란히 배치 ──
+
+st.markdown(
+    '<div class="section-title">지점별 비교</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<p class="section-desc">'
+    '기간 합계와 영업이익률을 함께 보면 '
+    '규모와 수익성을 비교할 수 있습니다.'
+    '</p>',
+    unsafe_allow_html=True
+)
+
+left, right = st.columns(2)
+
 with left:
-    st.plotly_chart(trend, width="stretch")
-with middle:
-    st.pyplot(static_fig, width="stretch")
-with right:
-    st.plotly_chart(margin_fig, width="stretch")
-# 다 쓴 Matplotlib 그림을 닫습니다.
-plt.close(static_fig)
-# 서버에 한글 글꼴이 없어 영어로 그렸다면 그 사실을 화면에 알립니다.
-if not kfont:
-    st.caption("이 서버에는 한글 글꼴이 없어 가운데 그림(Matplotlib)의 글자를 영어로 표시합니다.")
+    with st.container(border=True):
+        st.markdown(
+            "**지점별 기간 합계**"
+        )
+        st.pyplot(
+            static_fig,
+            width="stretch"
+        )
 
-st.subheader("현재 선택한 데이터")
-# 고른 행(view)을 표로 보입니다.
-st.dataframe(view, hide_index=True, width="stretch")
-# 지금 고른 데이터를 CSV로 내려받습니다. utf-8-sig는 엑셀 한글 깨짐을 막습니다.
-st.download_button("현재 선택 CSV 저장", data=view.to_csv(index=False).encode("utf-8-sig"),
-                   file_name="selected_sales.csv", mime="text/csv")
-st.caption("이 자료만으로 실적 변화의 원인을 단정하지 않습니다.")
+with right:
+    with st.container(border=True):
+        st.markdown(
+            "**지점별 기간 영업이익률**"
+        )
+        st.plotly_chart(
+            margin_fig,
+            width="stretch"
+        )
+
+plt.close(static_fig)
+
+if not kfont:
+    st.caption(
+        "참고: 서버에 한글 글꼴이 없어 "
+        "왼쪽 Matplotlib 차트의 축 이름은 "
+        "영어로 표시됩니다."
+    )
+
+
+# ── 데이터 표와 CSV 다운로드 ──
+
+st.markdown(
+    '<div class="section-title">데이터 상세 보기</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    '<p class="section-desc">'
+    '현재 조회 조건에 포함된 원본 행만 표시합니다.'
+    '</p>',
+    unsafe_allow_html=True
+)
+
+with st.container(border=True):
+
+    st.dataframe(
+        view.sort_values([
+            "branch",
+            "month"
+        ]),
+        hide_index=True,
+        width="stretch"
+    )
+
+    st.download_button(
+        "⬇ 현재 선택 데이터 CSV 다운로드",
+        data=view.to_csv(
+            index=False
+        ).encode("utf-8-sig"),
+        file_name="selected_sales.csv",
+        mime="text/csv"
+    )
+
+
+# ── 하단 안내 ──
+
+st.markdown(
+    '<div class="footnote">'
+    '출처: 수업용 가상 데이터(sales.csv) · '
+    '2026년 1~12월 · 단위: 백만원 · '
+    '이 자료만으로 실적 차이의 원인을 '
+    '단정할 수 없습니다.'
+    '</div>',
+    unsafe_allow_html=True
+)
